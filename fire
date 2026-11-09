@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Copyright 2026 Tu Nombre y colaboradores
+# SPDX-License-Identifier: GPL-2.0-only
+# Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos
+# de la Licencia Pública General GNU como publicada por la Free Software Foundation,
+# ya sea la versión 2 de la Licencia, o (a tu elección) cualquier versión posterior.
+
+#Alex
+#16.11.2023 mod 20.05.2024
+
+#Llamo a otro script mio que actualiza correctamente
+#Es preferible usar fire, así me olbigo a actualizar
+#antes de usar firefox, si se hace mientras se ejecuta
+#no deja abrir mas pestañas hasta reiniciar firefox.
+
+# CON ARGUMENTOS es que quiero ejecutar firefox con argumentos y sin actualizar
+# ARGUMENTO PRIMERO es "llamada_desde_actualizar" se ejecuta firefox sin actualizar y sin argumentos
+# (predeterminada) si NO HAY ARGUMENTOS actualizo el sistema y abro firefox-esr lo antes posible
+#    internamente -> llamo a actualizar y llamo a "fire 1" desde actualizar
+
+if [ $# -ge 1 ]; then #Mayor o igual
+    #Si hay argumentos se desea ejecutar firefox
+    if [ "$1" = "llamada_desde_actualizar" ] && dpkg -s firefox-esr >/dev/null 2>&1; then #igual
+        #Si el primer argumento es "llamada_desde_actualizar" y
+        # firefox esta instalado -> se ejecuta firefox sin argumentos.
+        #   (llamada interna desde script actualizar)
+        #   Ej:     "fire llamada_desde_actualizar"
+        echo "  firefox-esr &"  #Informo de que se ejecuta firefox
+        #firefox-esr > /dev/null 2>&1 &
+        nohup firefox-esr > /dev/null 2>&1 &
+    elif  [ "$1" = "e" ]; then
+        #Caso quiero actualizar y cerrar terminal al terminar
+        #   Ej:     "fire e"
+        actualizar llamada_desde_fire   #Actualizo y ejecuto firefox
+        kill -SIGKILL $PPID             #Cierro terminal que soporta este script
+    else
+        #Si se ejecuta con un el primer argumento distinto al anterior,
+        #se ejecuta normal con todos los argumntos que se llamen.
+        #   Ej:     "fire youtube.com live.com"
+        echo "  firefox-esr &"  #Informo de que se ejecuta firefox
+        #firefox-esr $* > /dev/null 2>&1 &
+        nohup firefox-esr $* > /dev/null 2>&1 &
+    fi
+else
+    #Si no hay argumentos se actualiza el
+    #sistema y se llama a firefox
+    #   Ej:     "fire"
+    actualizar llamada_desde_fire
+fi
+
+
+#Bipgrafía
+#Condicionales
+#https://atareao.es/tutorial/scripts-en-bash/condicionales-en-bash/

@@ -1,0 +1,292 @@
+#!/bin/bash
+
+# Copyright 2026 Tu Nombre y colaboradores
+# SPDX-License-Identifier: GPL-2.0-only
+# Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos
+# de la Licencia Pública General GNU como publicada por la Free Software Foundation,
+# ya sea la versión 2 de la Licencia, o (a tu elección) cualquier versión posterior.
+
+# 12.12.2023
+#Alex
+#  Mejoras:     29.05.2024
+#               03.11.2025 (comprueba conexión y contraseña)
+#               03.11.2025 (añadida fecha en los echos, timeout a espera de red)
+#               21.12.2025 (añadido eliminar el timeout de la contraseña del sudo)
+#  v.1.2.34     21.12.2025 (wget solucionado 1 fallaba, y correcciones menores)
+#  v.1.2.35     07.01.2026 (Informa de datos en papelera, cantidad y tamaño)
+#  v.1.2.36     07.01.2026 (Añadido saludo personalizado con nombre de usuario)
+#  v.1.2.37     08.01.2026 (Resumen final con tiempo, eliminados y fin terminal)
+#  v.1.2.38     03.02.2026 (La contraseña se pone antes de intento de conexion)
+#  v.1.2.39     25.02.2026 (Comentat el kill final, no va. Sense espera inicial)
+#  v.1.2.40     24.03.2026 (Inclos colors en fecha, millorat temps final goteo)
+#  v.1.2.41     05.09.2026 (Ja no s'instala firefox si no estaba instalat)
+ver="1.2.41     05.09.2026"
+
+#IDEAS DE MEJORA
+# Aprender captura de Ctrl-c para avisar
+# Añadir tiempo de actualizar
+# Autoguardado de la salida de todo el script
+# Autocerrado de la terminal
+# Añadir "empezando actualización
+# Añadir mostrar la versión actial.
+# Añadir en el finalizar, tamaño anterior y posterior de ssd
+# Dar la bienvenida al nombre del usuario
+# Añadirle licencia al código
+# Mostrar cambio de tamaño de carpeta usuario después de borrar (du -s ~)
+# Dirigirte al nombre de usuario
+# Si algun comando devuelve !0 se informa del error.
+# Comprobación inicial de que está libre el dpki para actualizar.
+# Para el apartrado final
+    #Se han actualizado x paquetes ???
+    #tamaño de la actualizacion
+    #tamaño liberado en autorremove
+    #para ver de nuevo la salida usar este comando...
+
+
+
+
+#   VARIABLES GENERALES DE GESTIÓN
+#El tiempo de espera para reintentar conexión de red (en segundos)
+timeout=20
+#Tiempos de espera (dinamismo) en segundos
+esperas=0.5
+#Valor $esperas*este de muestra por goteo de info final
+multiplicadorEsperaFinal=0.6
+#La web a la que se conecta para comprobar la conexión
+# ipRed="http://1.0.0.1"
+ipRed="http://one.one.one.one" #En algunas redes no va
+ipRed2="youtube.com"
+#Evitamos que pueda estar activado el timeout de la contraseña del sudo
+sudo -k
+#Colores para la fecha
+  #colorNormal="\e[0m"  #No se necesita
+    colorBase="\e[1;34;47m"
+   colorFallo="\e[1;37;41m"
+colorCorrecto="\e[1;37;42m"
+colorInstalar="\e[1;31;47m"
+ colorLimpiar=$colorBase
+
+#Benvinguda
+nom=$(who | awk '{printf $1}')
+echo
+fecha $colorBase
+echo "   >>> Benvingut a l'actualitzador d'Alex, $nom :) <<<"
+#sleep $esperas
+fecha $colorBase
+echo "       Versió.$ver"
+#sleep $esperas
+echo
+
+
+#Obtenemos la contraseña
+i=1
+while [ $i -ne 0 ]
+do
+    #Pedimos contraseña
+    fecha $colorBase
+    echo -n ">Introduix la contasenya de l'administrador($i): "
+    read -r -s contra
+    echo
+
+    #Comprobamos que la contraseña sea correcta (3.11.25)
+    echo $contra | sudo -k -S cat /etc/passwd &>/dev/null
+    if [ $? -ne 0 ]
+    then
+        #Si contraseña erronea
+        fecha $colorFallo
+        echo ">Intenta-ho de nou($i)...<"
+        ((i++))
+    else
+        #Si contraseña correcta
+        i=0
+        fecha $colorCorrecto
+        echo -e "\t>Contrasenya CORRECTA<"
+    fi
+done
+
+
+#Esperamos a que haya conexión (3.11.25)
+fecha $colorBase
+echo ">Esperant conexió... ($ipRed)<"
+i=9987
+while [ $i -ne 0 ]
+do
+    #El retorno de wget es un 0 (a $?) cuando hay conexión
+    wget -q --spider "$ipRed" || wget -q --spider "$ipRed2" # aveces una falla por la red desde la que me conecto (eduroam)
+
+    if [ $? -ne 0 ]; #si NO equal ==> si no hay conexion
+    then
+        fecha $colorFallo
+        echo -e ">No hi ha conexió, autocomprobació en $timeout segons. ($i)<"
+        ((i++))
+        if [ $i -gt 10000 ] #Evitamos que se vaya de madre la variable
+        then
+            i=1
+        fi
+        fecha $colorBase
+        echo -e -n "> (apreta intro per a reintentar...)"
+        read -t $timeout
+        echo
+    else
+        #Si Tiene conexión sale del bucle
+        i=0
+        fecha $colorCorrecto
+        echo -e "\t>Conetat a la xarxa!<"
+        sleep $esperas
+    fi
+done
+
+
+#Generamos marca de tiempo inicial
+tiempoIni=$(date +%s)
+
+
+#Actualizamos Caché
+echo -e "\n### "
+echo -n "#   Actualitzant caché "
+fecha $colorBase
+echo
+echo "###"
+echo $contra | sudo -k -S apt-get update -y #> /dev/null
+
+
+#Actualizamos Firefox
+echo -e "\n###"
+echo -n "#   Actualitzant firefox-esr "
+fecha $colorInstalar
+echo
+echo "###"
+#Consultamos si está instalado, si lo está lo actualizamos
+if dpkg -s firefox-esr >/dev/null 2>&1; then
+    echo $contra | sudo -k -S apt-get upgrade -y firefox-esr
+    # echo $contra | sudo -k -S apt-get install -y firefox-esr #> /dev/null
+else
+    echo "Firefox no instalat...Ometent..."
+fi
+#Continuamos con sus argumentos
+if [ $# -ge 1 ]; then #Mayor o igual
+    #Si hay argumentos Comprobamos si queremos ejecutar firefox o actualiar argumentos
+    if [ $1 = "llamada_desde_fire" ]; then #igual
+        #Si el argumento es "llamada_desde_fire" querremos ejecutar firefox
+        # Porque se habrá llamado desde el script fire
+        fire llamada_desde_actualizar
+    else
+        #Actualizamos los elementos pasados como argumento
+        echo $contra | sudo -k -S apt-get install -y $*
+    fi
+fi
+#If you do not want to install new packages; when used in conjunction with install, only-upgrade will install upgrades for already installed packages only and ignore requests to install new packages: añadir "--only-upgrade"
+
+#Mostramos programas a actualizar
+echo -e "\n###"
+echo -n "#   Mostrant programes y elements a actualitzar "
+fecha $colorBase
+echo
+echo "###"
+###
+# Esta opción a veces necesita acción del usuario para
+# continuar, por tanto la descarto
+###
+#echo $contra | sudo -S apt list --upgradable #> /dev/null
+###
+# Estas opciones (todas son iguales) muestran una simulación
+# de upgrade, por tanto muestra los paquetes que se instalarán
+# sin acción del usuario.
+###
+# echo $contra | sudo -k -S apt-get upgrade -s
+# echo $contra | sudo -k -S apt-get upgrade --simulate
+echo $contra | sudo -k -S apt-get upgrade --just-print
+# echo $contra | sudo -k -S apt-get upgrade --dry-run
+# echo $contra | sudo -k -S apt-get upgrade --recon
+# echo $contra | sudo -k -S apt-get upgrade --no-act
+
+
+#Actualizamos Programas
+echo -e "\n###"
+echo -n "#   Actualitzant programes y sistema "
+fecha $colorInstalar
+echo
+echo "###"
+echo $contra | sudo -k -S apt-get upgrade --with-new-pkgs -y #> /dev/null
+
+
+#Eliminamos dependencias no usadas
+echo -e "\n###"
+echo -n "#   Aplicant autoremove "
+fecha  $colorInstalar
+echo
+echo "###"
+echo $contra | sudo -k -S apt-get autoremove -y #> /dev/null
+
+
+#Borramos papelera
+echo -e "\n###"
+echo -n "#   Borrant paperera "
+fecha $colorLimpiar
+echo
+echo "###"
+basuraCant=$(tree ~/.local/share/Trash | wc -l)
+if (( basuraCant == 3 ));
+then
+    basuraCant=0
+else
+    basuraCant=$((basuraCant-5))
+    basuraCant=$((basuraCant/2))
+fi
+fecha $colorLimpiar
+echo -e ">Hi ha $basuraCant elements a eliminar.<"
+fecha $colorLimpiar
+echo -n ">Espai a recuperar: "
+du -hs ~/.local/share/Trash | awk '{printf $1}'
+echo " <"
+fecha $colorLimpiar
+echo -e "\t>Borrant elements...<"
+rm -rf ~/.local/share/Trash/*
+fecha $colorLimpiar
+echo ">Paperera esborrada.<"
+
+
+#Resumen del final
+echo -e "\n###"
+echo -n "#   Resumen Final "
+fecha $colorBase
+echo
+echo "###"
+#Esperas del doble que en el resto del programa
+sleep $(echo "$esperas * $multiplicadorEsperaFinal" | bc)
+#Eliminamos el timeout de validez de la contraseña de sudo y salimos
+sudo -k
+#Obtenemos marca de tiempo final y la duración total
+tiempoFin=$(date +%s)
+fecha $colorCorrecto
+echo ">L'actualizació ha tardat $(($tiempoFin-$tiempoIni)) segons.<"
+sleep $(echo "$esperas * $multiplicadorEsperaFinal" | bc)
+fecha $colorCorrecto
+echo ">S'han eliminat $basuraCant elements de la paperera.<"
+sleep $(echo "$esperas * $multiplicadorEsperaFinal" | bc)
+fecha $colorCorrecto
+echo -e ">La finestra es tancará en 1 minut. (Ctrl+C per evitar-ho).<"
+sleep $(echo "$esperas * $multiplicadorEsperaFinal" | bc)
+fecha $colorCorrecto
+echo -e "\t>Finalitzat...<\n"
+#sleep 60
+# https://es.stackoverflow.com/questions/433025/que-puedo-hacer-para-que-cuando-termine-de-ejecutar-mi-script-se-cierre-autom%C3%A1
+#kill -9 $PPID
+
+
+
+
+
+
+
+
+
+
+
+#/dev/zero wiki
+#reset
+#stty https://www.enmimaquinafunciona.com/pregunta/175284/como-ocultar-la-entrada-de-texto-en-el-terminal
+#https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwjknJnKxYmDAxXYVKQEHdxYCRsQFnoECBMQAQ&url=https%3A%2F%2Faskubuntu.com%2Fquestions%2F990823%2Fapt-gives-unstable-cli-interface-warning&usg=AOvVaw1x1JKxhRdFceRZh5g8VeN9&opi=89978449
+#https://serverfault.com/questions/958003/how-to-disable-warning-apt-does-not-have-a-stable-cli-interfacehttps://serverfault.com/questions/958003/how-to-disable-warning-apt-does-not-have-a-stable-cli-interface
+#actualizar solo un paquete
+#https://www.cyberciti.biz/faq/ubuntu-upgrade-update-single-package-using-apt-get/
