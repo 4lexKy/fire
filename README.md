@@ -88,4 +88,5 @@ Este proyecto está licenciado bajo GPLv2 - consulta el archivo LICENSE para má
 >**Alex**
 - Github: [https://github.com/4lexKy](https://github.com/4lexKy)
 - Email: [alex.correu@pm.me](mailto:alex.correu@pm.me)
+
 ---
