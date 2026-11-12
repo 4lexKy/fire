@@ -158,7 +158,7 @@ echo
 echo "###"
 #Consultamos si está instalado, si lo está lo actualizamos
 if dpkg -s firefox-esr >/dev/null 2>&1; then
-    echo $contra | sudo -k -S apt-get upgrade -y firefox-esr
+    echo $contra | sudo -k -S apt-get upgrade --only-upgrade -y firefox-esr
     # echo $contra | sudo -k -S apt-get install -y firefox-esr #> /dev/null
 else
     echo "Firefox no instalat...Ometent..."
@@ -172,7 +172,7 @@ if [ $# -ge 1 ]; then #Mayor o igual
         fire llamada_desde_actualizar
     else
         #Actualizamos los elementos pasados como argumento
-        echo $contra | sudo -k -S apt-get install -y $*
+        echo $contra | sudo -k -S apt-get upgrade --only-upgrade -y $*
     fi
 fi
 #If you do not want to install new packages; when used in conjunction with install, only-upgrade will install upgrades for already installed packages only and ignore requests to install new packages: añadir "--only-upgrade"
